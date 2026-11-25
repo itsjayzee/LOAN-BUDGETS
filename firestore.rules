@@ -1,0 +1,690 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Default-Deny Catch-All Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Reusable Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidChatId(chatId) {
+      return chatId is string && chatId.size() >= 3 && chatId.size() <= 260 && chatId.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUsernameLower(handle) {
+      return handle is string && handle.size() >= 3 && handle.size() <= 32 && handle.matches('^[a-z0-9_]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedSignedIn() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerifiedSignedIn()
+        && isValidId(userId)
+        && request.auth.uid == userId;
+    }
+
+    function isValidCurrency(code) {
+      return code in ['USD', 'IQD', 'SAR', 'EUR', 'TRY', 'IRR'];
+    }
+
+    function isValidLanguage(lang) {
+      return lang in ['en', 'ar', 'ku', 'tr', 'fr', 'es'];
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidLoan(data, userId, loanId) {
+      return data.keys().hasAll([
+          'ownerId',
+          'id',
+          'personName',
+          'amount',
+          'type',
+          'currency',
+          'status',
+          'createdAtServer',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId',
+          'id',
+          'personName',
+          'linkedUsername',
+          'amount',
+          'paidAmount',
+          'type',
+          'currency',
+          'status',
+          'dueDate',
+          'dueTime',
+          'phone',
+          'notes',
+          'settledAt',
+          'exchangeRateAtEntry',
+          'fxRateToUsdAtEntry',
+          'createdAt',
+          'createdAtServer',
+          'updatedAt'
+        ])
+        && data.ownerId is string
+        && data.ownerId == userId
+        && data.id is string
+        && data.id == loanId
+        && isValidId(data.id)
+        && data.personName is string
+        && data.personName.size() >= 1
+        && data.personName.size() <= 160
+        && (!('linkedUsername' in data) || (data.linkedUsername is string && data.linkedUsername.size() <= 32 && data.linkedUsername.matches('^[a-zA-Z0-9_]*$')))
+        && (data.amount is int || data.amount is float)
+        && data.amount > 0
+        && data.amount <= 1000000000000
+        && (!('paidAmount' in data) || (
+          (data.paidAmount is int || data.paidAmount is float)
+          && data.paidAmount >= 0
+          && data.paidAmount <= data.amount
+        ))
+        && data.type in ['they_owe_me', 'i_owe_them']
+        && isValidCurrency(data.currency)
+        && data.status in ['active', 'settled']
+        && (!('dueDate' in data) || (data.dueDate is string && data.dueDate.size() <= 40))
+        && (!('dueTime' in data) || (data.dueTime is string && data.dueTime.size() <= 16))
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 60))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000))
+        && (!('settledAt' in data) || (data.settledAt is string && data.settledAt.size() <= 64))
+        && (!('exchangeRateAtEntry' in data) || ((data.exchangeRateAtEntry is int || data.exchangeRateAtEntry is float) && data.exchangeRateAtEntry > 0 && data.exchangeRateAtEntry <= 100000000))
+        && (!('fxRateToUsdAtEntry' in data) || ((data.fxRateToUsdAtEntry is int || data.fxRateToUsdAtEntry is float) && data.fxRateToUsdAtEntry > 0 && data.fxRateToUsdAtEntry <= 100000000))
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64))
+        && data.createdAtServer is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCustomRates(rates) {
+      return rates is map
+        && rates.keys().hasAll(['USD', 'IQD', 'EUR', 'TRY', 'IRR'])
+        && rates.keys().hasOnly(['USD', 'IQD', 'SAR', 'EUR', 'TRY', 'IRR'])
+        && (rates.USD is int || rates.USD is float) && rates.USD > 0
+        && (rates.IQD is int || rates.IQD is float) && rates.IQD > 0
+        && (!('SAR' in rates) || ((rates.SAR is int || rates.SAR is float) && rates.SAR > 0))
+        && (rates.EUR is int || rates.EUR is float) && rates.EUR > 0
+        && (rates.TRY is int || rates.TRY is float) && rates.TRY > 0
+        && (rates.IRR is int || rates.IRR is float) && rates.IRR > 0;
+    }
+
+    function isValidPreferences(data, userId) {
+      return data.keys().hasAll([
+          'ownerId',
+          'language',
+          'currency',
+          'theme',
+          'createdAtServer',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId',
+          'language',
+          'currency',
+          'theme',
+          'fontSize',
+          'viewMode',
+          'sortOrder',
+          'profileName',
+          'profileUsername',
+          'profileBio',
+          'profileAvatar',
+          'profileJoinedAt',
+          'lastUsernameChangeDate',
+          'lastUsernameChangedAt',
+          'profileFibAccount',
+          'maskBalances',
+          'soundEffectsEnabled',
+          'pushNotificationsEnabled',
+          'overdueFollowUpEnabled',
+          'customBgImage',
+          'bgOpacity',
+          'bgBlur',
+          'customRates',
+          'showDualCurrency',
+          'dualPrimaryCurrency',
+          'createdAtServer',
+          'updatedAt'
+        ])
+        && data.ownerId is string
+        && data.ownerId == userId
+        && isValidLanguage(data.language)
+        && isValidCurrency(data.currency)
+        && data.theme in ['obsidian_neon', 'midnight_gold', 'nordic_frost', 'velvet_pink', 'dark', 'light', 'emerald', 'sapphire', 'amethyst', 'sunset', 'custom']
+        && (!('fontSize' in data) || data.fontSize in ['small', 'medium', 'large'])
+        && (!('viewMode' in data) || data.viewMode in ['compact', 'spacious'])
+        && (!('sortOrder' in data) || data.sortOrder in ['newest', 'oldest', 'highest_amount', 'due_soonest', 'name_asc'])
+        && (!('profileName' in data) || (data.profileName is string && data.profileName.size() <= 120))
+        && (!('profileUsername' in data) || (data.profileUsername is string && data.profileUsername.size() <= 40 && data.profileUsername.matches('^[a-zA-Z0-9_]*$')))
+        && (!('profileBio' in data) || (data.profileBio is string && data.profileBio.size() <= 400))
+        && (!('profileAvatar' in data) || (data.profileAvatar is string && data.profileAvatar.size() <= 250000))
+        && (!('profileJoinedAt' in data) || (data.profileJoinedAt is string && data.profileJoinedAt.size() <= 64))
+        && (!('lastUsernameChangeDate' in data) || (data.lastUsernameChangeDate is string && data.lastUsernameChangeDate.size() <= 64))
+        && (!('lastUsernameChangedAt' in data) || data.lastUsernameChangedAt is timestamp)
+        && (!('profileFibAccount' in data) || (data.profileFibAccount is string && data.profileFibAccount.size() <= 34 && data.profileFibAccount.matches('^[A-Z0-9]*$')))
+        && (!('maskBalances' in data) || data.maskBalances is bool)
+        && (!('soundEffectsEnabled' in data) || data.soundEffectsEnabled is bool)
+        && (!('pushNotificationsEnabled' in data) || data.pushNotificationsEnabled is bool)
+        && (!('overdueFollowUpEnabled' in data) || data.overdueFollowUpEnabled is bool)
+        && (!('customBgImage' in data) || (data.customBgImage is string && data.customBgImage.size() <= 600000))
+        && (!('bgOpacity' in data) || ((data.bgOpacity is int || data.bgOpacity is float) && data.bgOpacity >= 0 && data.bgOpacity <= 1))
+        && (!('bgBlur' in data) || ((data.bgBlur is int || data.bgBlur is float) && data.bgBlur >= 0 && data.bgBlur <= 50))
+        && (!('customRates' in data) || isValidCustomRates(data.customRates))
+        && (!('showDualCurrency' in data) || data.showDualCurrency is bool)
+        && (!('dualPrimaryCurrency' in data) || data.dualPrimaryCurrency in ['USD', 'IQD'])
+        && data.createdAtServer is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isUsernameChangingOnProfileUpdate() {
+      return (
+        (!('profileUsername' in existing()) && ('profileUsername' in incoming()) && incoming().profileUsername != '')
+        || (
+          ('profileUsername' in existing()) && ('profileUsername' in incoming())
+          && incoming().profileUsername.lower() != existing().profileUsername.lower()
+        )
+        || (('profileUsername' in existing()) && existing().profileUsername != '' && !('profileUsername' in incoming()))
+      );
+    }
+
+    function isUsernameCooldownSatisfiedOnCreate() {
+      return (
+        !('profileUsername' in incoming())
+        || incoming().profileUsername == ''
+        || (
+          'lastUsernameChangedAt' in incoming()
+          && incoming().lastUsernameChangedAt == request.time
+        )
+      );
+    }
+
+    function isUsernameCooldownSatisfiedOnUpdate() {
+      return isUsernameChangingOnProfileUpdate()
+        ? (
+          (
+            !('profileUsername' in existing())
+            || existing().profileUsername == ''
+            || !('lastUsernameChangedAt' in existing())
+            || request.time >= existing().lastUsernameChangedAt + duration.value(7, 'd')
+          )
+          && 'lastUsernameChangedAt' in incoming()
+          && incoming().lastUsernameChangedAt == request.time
+        )
+        : (
+          (!('lastUsernameChangedAt' in existing()) && !('lastUsernameChangedAt' in incoming()))
+          || (
+            'lastUsernameChangedAt' in existing()
+            && 'lastUsernameChangedAt' in incoming()
+            && incoming().lastUsernameChangedAt == existing().lastUsernameChangedAt
+          )
+        );
+    }
+
+    function isValidTransaction(data, userId, transactionId) {
+      return data.keys().hasAll([
+          'ownerId',
+          'id',
+          'loanId',
+          'personName',
+          'loanType',
+          'action',
+          'amountChange',
+          'balanceBefore',
+          'balanceAfter',
+          'currency',
+          'timestamp',
+          'dateStr',
+          'createdAtServer'
+        ])
+        && data.keys().hasOnly([
+          'ownerId',
+          'id',
+          'loanId',
+          'personName',
+          'linkedUsername',
+          'loanType',
+          'action',
+          'amountChange',
+          'balanceBefore',
+          'balanceAfter',
+          'currency',
+          'timestamp',
+          'dateStr',
+          'notes',
+          'exchangeRateAtEntry',
+          'fxRateToUsdAtEntry',
+          'createdAtServer'
+        ])
+        && data.ownerId is string
+        && data.ownerId == userId
+        && data.id is string
+        && data.id == transactionId
+        && isValidId(data.id)
+        && data.loanId is string
+        && isValidId(data.loanId)
+        && data.personName is string
+        && data.personName.size() >= 1
+        && data.personName.size() <= 160
+        && (!('linkedUsername' in data) || (data.linkedUsername is string && data.linkedUsername.size() <= 32 && data.linkedUsername.matches('^[a-zA-Z0-9_]*$')))
+        && data.loanType in ['they_owe_me', 'i_owe_them']
+        && data.action in ['created', 'added_money', 'repayment', 'settled', 'card_payment', 'restored', 'deleted', 'edited']
+        && (data.amountChange is int || data.amountChange is float)
+        && data.amountChange >= 0
+        && data.amountChange <= 1000000000000
+        && (data.balanceBefore is int || data.balanceBefore is float)
+        && data.balanceBefore >= 0
+        && data.balanceBefore <= 1000000000000
+        && (data.balanceAfter is int || data.balanceAfter is float)
+        && data.balanceAfter >= 0
+        && data.balanceAfter <= 1000000000000
+        && isValidCurrency(data.currency)
+        && data.timestamp is string
+        && data.timestamp.size() >= 1
+        && data.timestamp.size() <= 64
+        && data.dateStr is string
+        && data.dateStr.size() >= 1
+        && data.dateStr.size() <= 32
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000))
+        && (!('exchangeRateAtEntry' in data) || ((data.exchangeRateAtEntry is int || data.exchangeRateAtEntry is float) && data.exchangeRateAtEntry > 0 && data.exchangeRateAtEntry <= 100000000))
+        && (!('fxRateToUsdAtEntry' in data) || ((data.fxRateToUsdAtEntry is int || data.fxRateToUsdAtEntry is float) && data.fxRateToUsdAtEntry > 0 && data.fxRateToUsdAtEntry <= 100000000))
+        && data.createdAtServer is timestamp;
+    }
+
+    function isValidUsernameHandle(data, usernameLower) {
+      return data.keys().hasAll(['uid', 'usernameLower', 'username', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'usernameLower', 'username', 'displayName', 'avatar', 'bio', 'fibAccount', 'updatedAt'])
+        && data.uid is string
+        && data.uid == request.auth.uid
+        && isValidId(data.uid)
+        && data.usernameLower is string
+        && data.usernameLower == usernameLower
+        && isValidUsernameLower(data.usernameLower)
+        && data.username is string
+        && data.username.size() >= 3
+        && data.username.size() <= 32
+        && data.username.matches('^[a-zA-Z0-9_]+$')
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120))
+        && (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 250000))
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 300))
+        && (!('fibAccount' in data) || (data.fibAccount is string && data.fibAccount.size() <= 34 && data.fibAccount.matches('^[A-Z0-9]*$')))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFriendContact(data, userId, friendUid) {
+      return data.keys().hasAll(['ownerId', 'friendUid', 'createdAtServer', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'friendUid', 'username', 'displayName', 'avatar', 'bio', 'fibAccount', 'addedAtIso', 'createdAtServer', 'updatedAt'])
+        && data.ownerId is string
+        && data.ownerId == userId
+        && data.friendUid is string
+        && data.friendUid == friendUid
+        && data.friendUid != userId
+        && isValidId(data.friendUid)
+        && (!('username' in data) || (
+          data.username is string
+          && data.username.size() <= 32
+          && data.username.matches('^[a-zA-Z0-9_]*$')
+          && (data.username.size() == 0 || data.username.size() >= 3)
+        ))
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120))
+        && (
+          ('username' in data && data.username.size() >= 3)
+          || ('displayName' in data && data.displayName.size() >= 1)
+        )
+        && (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 250000))
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 300))
+        && (!('fibAccount' in data) || (data.fibAccount is string && data.fibAccount.size() <= 34 && data.fibAccount.matches('^[A-Z0-9]*$')))
+        && (!('addedAtIso' in data) || (data.addedAtIso is string && data.addedAtIso.size() <= 64))
+        && data.createdAtServer is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidChatThread(data, chatId) {
+      return data.keys().hasAll(['id', 'participantA', 'participantB', 'participantIds', 'createdAtServer', 'updatedAt'])
+        && data.keys().hasOnly([
+          'id',
+          'participantA',
+          'participantB',
+          'participantIds',
+          'participantProfiles',
+          'lastMessageText',
+          'lastMessageAtIso',
+          'lastSenderId',
+          'createdAtServer',
+          'updatedAt'
+        ])
+        && data.id is string
+        && data.id == chatId
+        && isValidChatId(data.id)
+        && data.participantA is string
+        && isValidId(data.participantA)
+        && data.participantB is string
+        && isValidId(data.participantB)
+        && data.participantA != data.participantB
+        && data.participantIds is list
+        && data.participantIds.size() == 2
+        && data.participantIds[0] is string
+        && data.participantIds[1] is string
+        && data.participantA in data.participantIds
+        && data.participantB in data.participantIds
+        && request.auth.uid in data.participantIds
+        && (!('participantProfiles' in data) || (data.participantProfiles is map && data.participantProfiles.keys().size() <= 2))
+        && (!('lastMessageText' in data) || (data.lastMessageText is string && data.lastMessageText.size() <= 300))
+        && (!('lastMessageAtIso' in data) || (data.lastMessageAtIso is string && data.lastMessageAtIso.size() <= 64))
+        && (!('lastSenderId' in data) || (data.lastSenderId is string && data.lastSenderId.size() <= 128))
+        && data.createdAtServer is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidChatMessage(data, chatId, messageId) {
+      return data.keys().hasAll(['id', 'chatId', 'senderId', 'text', 'messageKind', 'clientCreatedAt', 'createdAtServer'])
+        && data.keys().hasOnly([
+          'id',
+          'chatId',
+          'senderId',
+          'senderName',
+          'text',
+          'messageKind',
+          'linkedLoanId',
+          'linkedLoanPerson',
+          'linkedLoanUsername',
+          'linkedLoanAmount',
+          'linkedLoanCurrency',
+          'linkedLoanType',
+          'linkedLoanStatus',
+          'clientCreatedAt',
+          'createdAtServer'
+        ])
+        && data.id is string
+        && data.id == messageId
+        && isValidId(data.id)
+        && data.chatId is string
+        && data.chatId == chatId
+        && isValidChatId(data.chatId)
+        && data.senderId is string
+        && data.senderId == request.auth.uid
+        && (!('senderName' in data) || (data.senderName is string && data.senderName.size() <= 120))
+        && data.text is string
+        && data.text.size() >= 1
+        && data.text.size() <= 1000
+        && data.messageKind in ['text', 'loan_ref', 'payment_update']
+        && (!('linkedLoanId' in data) || (data.linkedLoanId is string && data.linkedLoanId.size() <= 128))
+        && (!('linkedLoanPerson' in data) || (data.linkedLoanPerson is string && data.linkedLoanPerson.size() <= 160))
+        && (!('linkedLoanUsername' in data) || (data.linkedLoanUsername is string && data.linkedLoanUsername.size() <= 32 && data.linkedLoanUsername.matches('^[a-zA-Z0-9_]*$')))
+        && (!('linkedLoanAmount' in data) || ((data.linkedLoanAmount is int || data.linkedLoanAmount is float) && data.linkedLoanAmount >= 0 && data.linkedLoanAmount <= 1000000000000))
+        && (!('linkedLoanCurrency' in data) || isValidCurrency(data.linkedLoanCurrency))
+        && (!('linkedLoanType' in data) || data.linkedLoanType in ['they_owe_me', 'i_owe_them'])
+        && (!('linkedLoanStatus' in data) || data.linkedLoanStatus in ['active', 'settled'])
+        && data.clientCreatedAt is string
+        && data.clientCreatedAt.size() >= 1
+        && data.clientCreatedAt.size() <= 64
+        && data.createdAtServer is timestamp;
+    }
+
+    function isChatMember(chatId) {
+      return isVerifiedSignedIn()
+        && isValidChatId(chatId)
+        && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participantIds;
+    }
+
+    // 4. Per-User Loans Collection (/users/{userId}/loans/{loanId})
+    match /users/{userId}/loans/{loanId} {
+      allow get: if isVerifiedOwner(userId)
+        && isValidId(loanId)
+        && resource.data.ownerId == request.auth.uid;
+
+      allow list: if isVerifiedOwner(userId)
+        && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(loanId)
+        && isValidLoan(incoming(), userId, loanId)
+        && incoming().createdAtServer == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedOwner(userId)
+        && isValidId(loanId)
+        && existing().ownerId == request.auth.uid
+        && isValidLoan(incoming(), userId, loanId)
+        && incoming().ownerId == existing().ownerId
+        && incoming().id == existing().id
+        && incoming().createdAtServer == existing().createdAtServer
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'personName',
+            'linkedUsername',
+            'amount',
+            'paidAmount',
+            'type',
+            'currency',
+            'status',
+            'dueDate',
+            'dueTime',
+            'phone',
+            'notes',
+            'settledAt',
+            'exchangeRateAtEntry',
+            'fxRateToUsdAtEntry',
+            'updatedAt'
+          ])
+        );
+
+      allow delete: if isVerifiedOwner(userId)
+        && isValidId(loanId)
+        && existing().ownerId == request.auth.uid;
+    }
+
+    // 5. Per-User Preferences & Profile (/users/{userId}/profile/{docId})
+    match /users/{userId}/profile/{docId} {
+      allow get: if isVerifiedOwner(userId)
+        && isValidId(docId)
+        && docId == 'settings'
+        && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(docId)
+        && docId == 'settings'
+        && isValidPreferences(incoming(), userId)
+        && isUsernameCooldownSatisfiedOnCreate()
+        && incoming().createdAtServer == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedOwner(userId)
+        && isValidId(docId)
+        && docId == 'settings'
+        && existing().ownerId == request.auth.uid
+        && isValidPreferences(incoming(), userId)
+        && isUsernameCooldownSatisfiedOnUpdate()
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAtServer == existing().createdAtServer
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'language',
+            'currency',
+            'theme',
+            'fontSize',
+            'viewMode',
+            'sortOrder',
+            'profileName',
+            'profileUsername',
+            'profileBio',
+            'profileAvatar',
+            'profileJoinedAt',
+            'lastUsernameChangeDate',
+            'lastUsernameChangedAt',
+            'profileFibAccount',
+            'maskBalances',
+            'soundEffectsEnabled',
+            'pushNotificationsEnabled',
+            'overdueFollowUpEnabled',
+            'customBgImage',
+            'bgOpacity',
+            'bgBlur',
+            'customRates',
+            'showDualCurrency',
+            'dualPrimaryCurrency',
+            'updatedAt'
+          ])
+        );
+
+      allow delete: if isVerifiedOwner(userId)
+        && isValidId(docId)
+        && docId == 'settings'
+        && existing().ownerId == request.auth.uid;
+    }
+
+    // 6. Per-User Transactions Ledger Collection (/users/{userId}/transactions/{transactionId})
+    match /users/{userId}/transactions/{transactionId} {
+      allow get: if isVerifiedOwner(userId)
+        && isValidId(transactionId)
+        && resource.data.ownerId == request.auth.uid;
+
+      allow list: if isVerifiedOwner(userId)
+        && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(transactionId)
+        && isValidTransaction(incoming(), userId, transactionId)
+        && incoming().createdAtServer == request.time;
+
+      allow update: if false;
+
+      allow delete: if isVerifiedOwner(userId)
+        && isValidId(transactionId)
+        && existing().ownerId == request.auth.uid;
+    }
+
+    // 7. Public PII-Free Handle Directory (/usernames/{usernameLower}) - Exact lookup only
+    match /usernames/{usernameLower} {
+      allow get: if isValidUsernameLower(usernameLower);
+      allow list: if false;
+
+      allow create: if isVerifiedSignedIn()
+        && isValidUsernameLower(usernameLower)
+        && isValidUsernameHandle(incoming(), usernameLower)
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedSignedIn()
+        && isValidUsernameLower(usernameLower)
+        && existing().uid == request.auth.uid
+        && isValidUsernameHandle(incoming(), usernameLower)
+        && incoming().uid == existing().uid
+        && incoming().usernameLower == existing().usernameLower
+        && incoming().updatedAt == request.time;
+
+      allow delete: if isVerifiedSignedIn()
+        && isValidUsernameLower(usernameLower)
+        && existing().uid == request.auth.uid;
+    }
+
+    // 8. Per-User Friends Directory (/users/{userId}/friends/{friendUid})
+    match /users/{userId}/friends/{friendUid} {
+      allow get: if isVerifiedOwner(userId)
+        && isValidId(friendUid)
+        && resource.data.ownerId == request.auth.uid;
+
+      allow list: if isVerifiedOwner(userId)
+        && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(friendUid)
+        && isValidFriendContact(incoming(), userId, friendUid)
+        && incoming().createdAtServer == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedOwner(userId)
+        && isValidId(friendUid)
+        && existing().ownerId == request.auth.uid
+        && isValidFriendContact(incoming(), userId, friendUid)
+        && incoming().ownerId == existing().ownerId
+        && incoming().friendUid == existing().friendUid
+        && incoming().createdAtServer == existing().createdAtServer
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'username',
+          'displayName',
+          'avatar',
+          'bio',
+          'fibAccount',
+          'updatedAt'
+        ]);
+
+      allow delete: if isVerifiedOwner(userId)
+        && isValidId(friendUid)
+        && existing().ownerId == request.auth.uid;
+    }
+
+    // 9. Real-Time 1-to-1 Friend Chat Threads (/chats/{chatId}) & Messages (/chats/{chatId}/messages/{messageId})
+    match /chats/{chatId} {
+      allow get: if isVerifiedSignedIn()
+        && isValidChatId(chatId)
+        && request.auth.uid in resource.data.participantIds;
+
+      allow list: if isVerifiedSignedIn()
+        && request.auth.uid in resource.data.participantIds;
+
+      allow create: if isVerifiedSignedIn()
+        && isValidChatId(chatId)
+        && isValidChatThread(incoming(), chatId)
+        && incoming().createdAtServer == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedSignedIn()
+        && isValidChatId(chatId)
+        && request.auth.uid in existing().participantIds
+        && isValidChatThread(incoming(), chatId)
+        && incoming().id == existing().id
+        && incoming().participantA == existing().participantA
+        && incoming().participantB == existing().participantB
+        && incoming().participantIds == existing().participantIds
+        && incoming().createdAtServer == existing().createdAtServer
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'participantProfiles',
+          'lastMessageText',
+          'lastMessageAtIso',
+          'lastSenderId',
+          'updatedAt'
+        ]);
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get: if isChatMember(chatId) && isValidId(messageId);
+        allow list: if isChatMember(chatId);
+
+        allow create: if isChatMember(chatId)
+          && isValidId(messageId)
+          && isValidChatMessage(incoming(), chatId, messageId)
+          && incoming().createdAtServer == request.time;
+
+        allow update: if false;
+
+        allow delete: if isChatMember(chatId)
+          && isValidId(messageId)
+          && existing().senderId == request.auth.uid;
+      }
+    }
+  }
+}

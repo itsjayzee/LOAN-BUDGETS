@@ -1,0 +1,677 @@
+{
+  "entities": {
+    "UserLoan": {
+      "title": "UserLoan",
+      "description": "A personal debt or credit record owned by an authenticated user (active or archived).",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Firebase Auth UID of the record owner."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Unique loan document identifier."
+        },
+        "personName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Counterparty name or @username display label."
+        },
+        "linkedUsername": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_]*$",
+          "description": "Exact recipient or debtor @username handle bound to this debt."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Total principal loan amount."
+        },
+        "paidAmount": {
+          "type": "number",
+          "description": "Total amount repaid so far."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["they_owe_me", "i_owe_them"],
+          "description": "Direction of the debt."
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["USD", "IQD", "SAR", "EUR", "TRY", "IRR"],
+          "description": "ISO currency code."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "settled"],
+          "description": "Active or archived settled status."
+        },
+        "dueDate": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Optional YYYY-MM-DD due date."
+        },
+        "dueTime": {
+          "type": "string",
+          "maxLength": 16,
+          "description": "Optional HH:mm due time."
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Optional counterparty phone number."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Optional notes or purpose."
+        },
+        "settledAt": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Optional settlement date/timestamp."
+        },
+        "exchangeRateAtEntry": {
+          "type": "number",
+          "description": "USD to IQD market exchange rate preserved at record entry."
+        },
+        "fxRateToUsdAtEntry": {
+          "type": "number",
+          "description": "Units of record currency per 1 USD preserved at record entry."
+        },
+        "createdAt": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Client-formatted creation date."
+        },
+        "createdAtServer": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "id",
+        "personName",
+        "amount",
+        "type",
+        "currency",
+        "status",
+        "createdAtServer",
+        "updatedAt"
+      ]
+    },
+    "UserPreferences": {
+      "title": "UserPreferences",
+      "description": "Cloud-synced settings, language, theme, and custom exchange rates for an authenticated user.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Firebase Auth UID of the settings owner."
+        },
+        "language": {
+          "type": "string",
+          "enum": ["en", "ar", "ku", "tr", "fr", "es"],
+          "description": "Interface language."
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["USD", "IQD", "SAR", "EUR", "TRY", "IRR"],
+          "description": "Primary display currency."
+        },
+        "theme": {
+          "type": "string",
+          "enum": ["obsidian_neon", "midnight_gold", "nordic_frost", "velvet_pink", "dark", "light", "emerald", "sapphire", "amethyst", "sunset", "custom"],
+          "description": "UI theme mode."
+        },
+        "fontSize": {
+          "type": "string",
+          "enum": ["small", "medium", "large"],
+          "description": "Typography scale."
+        },
+        "viewMode": {
+          "type": "string",
+          "enum": ["compact", "spacious"],
+          "description": "Card layout density."
+        },
+        "sortOrder": {
+          "type": "string",
+          "enum": ["newest", "oldest", "highest_amount", "due_soonest", "name_asc"],
+          "description": "Active loan list sort order."
+        },
+        "profileName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Display name."
+        },
+        "profileUsername": {
+          "type": "string",
+          "maxLength": 40,
+          "pattern": "^[a-zA-Z0-9_]*$",
+          "description": "Custom alphanumeric & underscore handle."
+        },
+        "profileBio": {
+          "type": "string",
+          "maxLength": 400,
+          "description": "User bio and financial profile summary."
+        },
+        "profileAvatar": {
+          "type": "string",
+          "maxLength": 250000,
+          "description": "Compressed square cropped profile avatar data URI."
+        },
+        "profileJoinedAt": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Account profile initialization date."
+        },
+        "lastUsernameChangeDate": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ISO 8601 timestamp of the most recent username modification."
+        },
+        "lastUsernameChangedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the most recent username modification used to enforce the 7-day cooldown."
+        },
+        "profileFibAccount": {
+          "type": "string",
+          "maxLength": 34,
+          "pattern": "^[A-Z0-9]*$",
+          "description": "Optional First Iraqi Bank (FIB) account number or Iraqi IBAN for instant settlement."
+        },
+        "maskBalances": {
+          "type": "boolean",
+          "description": "Privacy mask toggle."
+        },
+        "soundEffectsEnabled": {
+          "type": "boolean",
+          "description": "Financial sound chime preference."
+        },
+        "pushNotificationsEnabled": {
+          "type": "boolean",
+          "description": "Due-date notifications preference."
+        },
+        "overdueFollowUpEnabled": {
+          "type": "boolean",
+          "description": "24h overdue follow-up preference."
+        },
+        "customBgImage": {
+          "type": "string",
+          "maxLength": 600000,
+          "description": "Optional CSS background preset or compressed wallpaper data URI."
+        },
+        "bgOpacity": {
+          "type": "number",
+          "description": "Background image opacity."
+        },
+        "bgBlur": {
+          "type": "number",
+          "description": "Background image blur radius."
+        },
+        "customRates": {
+          "type": "object",
+          "description": "Custom FX exchange rates relative to 1 USD."
+        },
+        "showDualCurrency": {
+          "type": "boolean",
+          "description": "Toggle displaying subtle dual-currency converted equivalents underneath balances."
+        },
+        "dualPrimaryCurrency": {
+          "type": "string",
+          "enum": ["USD", "IQD"],
+          "description": "Primary summary currency for cross-currency portfolio aggregation."
+        },
+        "createdAtServer": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "language",
+        "currency",
+        "theme",
+        "createdAtServer",
+        "updatedAt"
+      ]
+    },
+    "UserTransaction": {
+      "title": "UserTransaction",
+      "description": "Immutable financial transaction ledger entry recording loan creation, repayments, additions, settlements, restorations, edits, and deletions.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Firebase Auth UID of the ledger owner."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Unique transaction identifier."
+        },
+        "loanId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Associated loan identifier."
+        },
+        "personName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Counterparty name or @username display label."
+        },
+        "linkedUsername": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_]*$",
+          "description": "Exact recipient or debtor @username handle associated with this ledger entry."
+        },
+        "loanType": {
+          "type": "string",
+          "enum": ["they_owe_me", "i_owe_them"],
+          "description": "Direction of debt (+ they_owe_me / - i_owe_them)."
+        },
+        "action": {
+          "type": "string",
+          "enum": ["created", "added_money", "repayment", "settled", "card_payment", "restored", "deleted", "edited"],
+          "description": "Ledger action type."
+        },
+        "amountChange": {
+          "type": "number",
+          "description": "Absolute monetary delta of this event."
+        },
+        "balanceBefore": {
+          "type": "number",
+          "description": "Remaining balance before this action."
+        },
+        "balanceAfter": {
+          "type": "number",
+          "description": "Remaining balance after this action."
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["USD", "IQD", "SAR", "EUR", "TRY", "IRR"],
+          "description": "Currency code."
+        },
+        "timestamp": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ISO 8601 timestamp."
+        },
+        "dateStr": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "YYYY-MM-DD local/UTC date string."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Optional ledger note."
+        },
+        "exchangeRateAtEntry": {
+          "type": "number",
+          "description": "USD to IQD market exchange rate preserved at transaction entry."
+        },
+        "fxRateToUsdAtEntry": {
+          "type": "number",
+          "description": "Units of transaction currency per 1 USD preserved at transaction entry."
+        },
+        "createdAtServer": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "id",
+        "loanId",
+        "personName",
+        "loanType",
+        "action",
+        "amountChange",
+        "balanceBefore",
+        "balanceAfter",
+        "currency",
+        "timestamp",
+        "dateStr",
+        "createdAtServer"
+      ]
+    },
+    "UsernameHandle": {
+      "title": "UsernameHandle",
+      "description": "Public, PII-free handle directory entry enabling exact @username lookup for Friends without exposing email or private data.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Firebase Auth UID of the handle owner."
+        },
+        "usernameLower": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "minLength": 3,
+          "maxLength": 32,
+          "description": "Lowercase normalized handle matching the document ID."
+        },
+        "username": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_]+$",
+          "minLength": 3,
+          "maxLength": 32,
+          "description": "Display handle preserving user casing."
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Public display name."
+        },
+        "avatar": {
+          "type": "string",
+          "maxLength": 250000,
+          "description": "Public cropped avatar URI."
+        },
+        "bio": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Public profile bio."
+        },
+        "fibAccount": {
+          "type": "string",
+          "maxLength": 34,
+          "pattern": "^[A-Z0-9]*$",
+          "description": "Optional public First Iraqi Bank (FIB) account number or Iraqi IBAN."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["uid", "usernameLower", "username", "updatedAt"]
+    },
+    "FriendContact": {
+      "title": "FriendContact",
+      "description": "Owner-managed friend entry discovered by @username handle.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Firebase Auth UID of the list owner."
+        },
+        "friendUid": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Firebase Auth UID of the friend."
+        },
+        "username": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_]*$",
+          "minLength": 0,
+          "maxLength": 32,
+          "description": "Friend's optional @username handle."
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Friend's display name."
+        },
+        "avatar": {
+          "type": "string",
+          "maxLength": 250000,
+          "description": "Friend's avatar URI."
+        },
+        "bio": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Friend's bio."
+        },
+        "fibAccount": {
+          "type": "string",
+          "maxLength": 34,
+          "pattern": "^[A-Z0-9]*$",
+          "description": "Friend's optional First Iraqi Bank (FIB) account number or Iraqi IBAN."
+        },
+        "addedAtIso": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ISO timestamp when added."
+        },
+        "createdAtServer": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["ownerId", "friendUid", "createdAtServer", "updatedAt"]
+    },
+    "FriendChatThread": {
+      "title": "FriendChatThread",
+      "description": "1-to-1 real-time chat channel between two verified users.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 3,
+          "maxLength": 260,
+          "description": "Deterministic sorted chat ID (minUid_maxUid)."
+        },
+        "participantA": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "First participant UID."
+        },
+        "participantB": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Second participant UID."
+        },
+        "participantIds": {
+          "type": "array",
+          "description": "Fixed 2-UID list for participant array-contains queries."
+        },
+        "participantProfiles": {
+          "type": "object",
+          "description": "Map of UID to public display name, username, and avatar snapshot."
+        },
+        "lastMessageText": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Preview of the most recent message."
+        },
+        "lastMessageAtIso": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ISO timestamp of the latest activity."
+        },
+        "lastSenderId": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "UID of the sender of the latest message."
+        },
+        "createdAtServer": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["id", "participantA", "participantB", "participantIds", "createdAtServer", "updatedAt"]
+    },
+    "FriendChatMessage": {
+      "title": "FriendChatMessage",
+      "description": "Real-time chat message inside a 1-to-1 thread, optionally linked to a specific loan record.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Unique message identifier."
+        },
+        "chatId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 3,
+          "maxLength": 260,
+          "description": "Parent chat thread identifier."
+        },
+        "senderId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Firebase Auth UID of the sender."
+        },
+        "senderName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Display name or @username of the sender."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "Message text content."
+        },
+        "messageKind": {
+          "type": "string",
+          "enum": ["text", "loan_ref", "payment_update"],
+          "description": "Message classification."
+        },
+        "linkedLoanId": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Optional referenced loan ID."
+        },
+        "linkedLoanPerson": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Optional referenced counterparty name."
+        },
+        "linkedLoanUsername": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_]*$",
+          "description": "Optional exact referenced counterparty @username handle."
+        },
+        "linkedLoanAmount": {
+          "type": "number",
+          "description": "Optional referenced remaining/total amount."
+        },
+        "linkedLoanCurrency": {
+          "type": "string",
+          "enum": ["USD", "IQD", "SAR", "EUR", "TRY", "IRR"],
+          "description": "Optional referenced loan currency."
+        },
+        "linkedLoanType": {
+          "type": "string",
+          "enum": ["they_owe_me", "i_owe_them"],
+          "description": "Optional referenced debt direction."
+        },
+        "linkedLoanStatus": {
+          "type": "string",
+          "enum": ["active", "settled"],
+          "description": "Optional referenced loan status."
+        },
+        "clientCreatedAt": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Client ISO timestamp for ordering."
+        },
+        "createdAtServer": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server creation timestamp."
+        }
+      },
+      "required": ["id", "chatId", "senderId", "text", "messageKind", "clientCreatedAt", "createdAtServer"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/loans/{loanId}": {
+      "schema": { "$ref": "#/entities/UserLoan" },
+      "description": "Per-user active and archived loan records synced across devices."
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/UserTransaction" },
+      "description": "Per-user financial transaction ledger entries synced across devices."
+    },
+    "/users/{userId}/profile/{docId}": {
+      "schema": { "$ref": "#/entities/UserPreferences" },
+      "description": "Per-user application preferences, multi-currency settings, and custom exchange rates."
+    },
+    "/usernames/{usernameLower}": {
+      "schema": { "$ref": "#/entities/UsernameHandle" },
+      "description": "Public PII-free @username handle directory supporting exact lookup."
+    },
+    "/users/{userId}/friends/{friendUid}": {
+      "schema": { "$ref": "#/entities/FriendContact" },
+      "description": "Owner-managed Friends directory."
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/FriendChatThread" },
+      "description": "Two-participant real-time chat channels."
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/FriendChatMessage" },
+      "description": "Real-time messages and loan references inside a friend chat thread."
+    }
+  }
+}
